@@ -1,0 +1,21 @@
+.SUFFIXES: .o .mod .f .F .f90 .F90
+.f.o :
+	$(FC) -c $(FFLAG) $(INCLUDE)  $<
+.F.o :
+	$(FC) -c $(FFLAG) $(DEF_MPI) $(INCLUDE)  $<
+.f90.o :
+	$(FC) -c $(FFLAG) $(INCLUDE)  $<
+.F90.o :
+	$(FC) -c $(FFLAG) $(DEF_MPI) $(INCLUDE)  $<
+.f.mod :
+	$(FC) -c $(FFLAG) $(INCLUDE)  $<
+.F.mod :
+	$(FC) -c $(FFLAG) $(DEF_MPI) $(INCLUDE)  $<
+.f90.mod :	
+	$(FC) -c $(FFLAG) $(INCLUDE)  $<
+.F90.mod :
+	$(FC) -c $(FFLAG) $(DEF_MPI) $(INCLUDE)  $<
+.c.o:
+	$(CC) -c $(CFLAG) $(CDEFS) $(INCLUDE) $< 
+%.o : %.mod
+
