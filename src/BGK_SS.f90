@@ -142,7 +142,7 @@ module BGK_SS
 #include "BGK_SS_DBLA.f90"       !complex single routine
 #undef SINGLE
 #include "BGK_SS_DBLA.f90"       !complex double routine
-
+#undef
 
 #include "BGK_SS_DM.f90"
     

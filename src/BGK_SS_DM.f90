@@ -1,45 +1,52 @@
-!c----------------------------------------------------------------------c
-!c                   BGK ���� SS ���� DenseModule                          c
-!c----------------------------------------------------------------------c
-!c                    FORMAT CONVERSION MODULE                          c
-!c----------------------------------------------------------------------c
-!c contents:                                                            c
-!c----------                                                            c
-!c csrdns  : converts a row-stored sparse matrix into the dense format. c
-!-----------------------------------------------------------------------��
+!------------------------------------------------------------------------!
+!                               BGK__SS__DM                              !
+!------------------------------------------------------------------------!
+!                     Dense Matrix Arithmetic Module                     ！
+!------------------------------------------------------------------------!
+! contents:                                                              !
+!----------                                                              !
+!  DenseLinearSolver                                                     !
+!  DenseStochastic                                                       !        !
+!------------------------------------------------------------------------! 
 #include "_BGK_SS.h"  
-    
-!------------------------------------------------------------------------��
-!c DenseLinearSolver
-!c----------------------------------------------------------------------- 
-!c
-!c To initialise the begin block matrix
-!c Note: -1 or 1 is even distributed in Every entry of this matrix 
-!c-----------------------------------------------------------------------
-!c on entry:
-!c---------
-!c
-!c nrow	= row-dimension of V
-!c ncol	= column dimension of V
-!c rank  = maximum order of V allowed.
-!c
-!c on return:
-!c---------- 
-!c 
-!c V =  The initial matrix
-!c
-!c ierr	= integer error indicator: 
-!c         ierr .eq. 0 means normal retur
-!c         ierr .eq.-1 means that the the code stopped 
-!c----------------------------------------------------------------------- 
-subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK, mpi_comm)
+!------------------------------------------------------------------------!
+! DenseLinearSolver                                                      !
+!------------------------------------------------------------------------! 
+!                                                                        ！
+! To solve the general eigenvalue problem of dense matrix                !   
+! Note: This reverse communication interface is only used for debug      !   
+!------------------------------------------------------------------------!
+! on entry:                                                              ！
+!---------                                                               ！
+!                                                                        ！
+! ptr = The global Indicator                                             ！
+! nrow = row-dimension of A and B                                        !
+! ncol = column dimension of A and B                                     !
+! A  = The dense matrix A                                                ！
+! B  = The dense matrix B                                                !
+! Iwork = The demension of the working array                             !
+!                                                                        ！  
+! on return:                                                             ！
+!----------                                                              ！
+!                                                                        ！
+! work = The working array, the dimention is equal (L+1+LM)*nrow         !
+!        The Top (1:nrow) workspace is for calculation                   !
+!        The nrow+1: (L+1)*nrow th is used for storing the initial block !
+!        matrix                                                          !
+!        The (L+1)*nrow+1: (L+1+LM)*nrow th is used for storing the      ！
+!        projection matrix S                                             ！
+!                                                                        ！
+!        More details about work please see BGK_SS_interface             ！
+!                                                                        ！
+!------------------------------------------------------------------------！-
+subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
   implicit none
   type(Indicator), intent(inout), target :: ptr
-  integer, intent(in)                    :: nrow, ncol, IWORK, mpi_comm
+  integer, intent(in)                    :: nrow, ncol, IWORK
   MATRIX_TYPE, intent(in)                :: A(nrow, ncol), B(nrow, ncol)
   MATRIX_TYPE, intent(inout)             :: work(IWORK)
   !---------------local variables--------------
-  integer      :: i, j, jx, L, M, N, IPIV(nrow), &
+  integer      :: i, j, jx, L, M, N, IPIV(nrow), mpi_comm&
                   taskstart, tasknum, Index,  ierr, subs
   COMPLEX_TYPE :: z, weight, zeta, const, temp(ncol)
   REAL_TYPE    :: ratio
@@ -48,12 +55,13 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK, mpi_comm)
   if(nrow .ne. ncol)then
       write(*, *) 'The Matrix is not square !'
       return
-  end if
+  end if\
   
   L = ptr%L
   Index = 0
   M = ptr%M
   N = ptr%N
+  mpi_comm = ptr%Mpi_Common
   select case(ptr%Method)
       
     case(SS_RaylaignRitzs)
@@ -98,29 +106,27 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK, mpi_comm)
 
 end subroutine
     
-!------------------------------------------------------------------------��
-! DenseStochastic
-!----------------------------------------------------------------------- 
-!
-! To initialise the begin block matrix
-! Note: -1 or 1 is even distributed in Every entry of this matrix 
-!-----------------------------------------------------------------------
-! on entry:
-!---------
-!
-! nrow	= row-dimension of V
-! ncol	= column dimension of V
-! rank  = maximum order of V allowed.
-!
-! on return:
-!---------- 
-! 
-! V =  The initial matrix
-!
-! ierr	= integer error indicator: 
-!         ierr .eq. 0 means normal retur
-!         ierr .eq.-1 means that the the code stopped 
-!----------------------------------------------------------------------- 
+!------------------------------------------------------------------------!
+! DenseStochastic                                                        !
+!------------------------------------------------------------------------! 
+!                                                                        ！
+! To approximate the numerical eigenvalue number within the region       !   
+! Note: This subroutine is not necessarily called for users              !   
+!------------------------------------------------------------------------!
+! on entry:                                                              ！
+!---------                                                               ！
+!                                                                        ！
+! ptr   = The global Indicator                                           ！
+! nrow  = row-dimension of A and B                                       ！
+! work  = The working array, the dimention is equal Iwork                !
+!         More details about work please see BGK_SS_interface            ！
+! Iwork = The demension of the working array                             !
+!                                                                        ！  
+! on return:                                                             ！
+!----------                                                              ！
+! m_num = The approximated number of selected region                     ！
+!                                                                        ！
+!------------------------------------------------------------------------！- 
 subroutine DenseStochastic(ptr, nrow, work, IWORK, m_num)
   implicit none
   type(Indicator), intent(inout), target :: ptr
@@ -157,30 +163,28 @@ subroutine DenseStochastic(ptr, nrow, work, IWORK, m_num)
   ptr%nev = nev
 
 end subroutine
-    
-!------------------------------------------------------------------------��
-! DenseSVD
-!----------------------------------------------------------------------- 
-!
-! To initialise the begin block matrix
-! Note: -1 or 1 is even distributed in Every entry of this matrix 
-!-----------------------------------------------------------------------
-! on entry:
-!---------
-!
-! nrow	= row-dimension of V
-! ncol	= column dimension of V
-! rank  = maximum order of V allowed.
-!
-! on return:
-!---------- 
-! 
-! V =  The initial matrix
-!
-! ierr	= integer error indicator: 
-!         ierr .eq. 0 means normal retur
-!         ierr .eq.-1 means that the the code stopped 
-!----------------------------------------------------------------------- 
+!------------------------------------------------------------------------!
+! DenseSVD                                                               !
+!------------------------------------------------------------------------! 
+!                                                                        ！
+! Singular value decomposition of projection matrix S                    !   
+! Note: SVD is adapted for lowrank approximation of projection matrix S  !
+!       This subroutine is differ with _SVD for various uses             ！   
+!------------------------------------------------------------------------!
+! on entry:                                                              ！
+!---------                                                               ！
+!                                                                        ！
+! ptr   = The global Indicator                                           ！
+! nrow  = row-dimension of A and B                                       ！
+! work  = The working array, dimention(Iwork)                            !
+! Iwork = The demension of the working array                             !
+!                                                                        ！  
+! on return:                                                             ！
+!----------                                                              ！
+! work  = The working array, dimention(Iwork)                            !
+!         More details about work please see BGK_SS_interface            ！
+!                                                                        ！
+!------------------------------------------------------------------------！
 subroutine DenseSVD(ptr, nrow, work, IWORK)
   implicit none
   type(Indicator), intent(inout), target :: ptr
@@ -251,29 +255,28 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
 
     end subroutine
     
-!------------------------------------------------------------------------��
-! DenseEigenSolver
-!----------------------------------------------------------------------- 
-!
-! To initialise the begin block matrix
-! Note: -1 or 1 is even distributed in Every entry of this matrix 
-!-----------------------------------------------------------------------
-! on entry:
-!---------
-!
-! nrow	= row-dimension of V
-! ncol	= column dimension of V
-! rank  = maximum order of V allowed.
-!
-! on return:
-!---------- 
-! 
-! V =  The initial matrix
-!
-! ierr	= integer error indicator: 
-!         ierr .eq. 0 means normal retur
-!         ierr .eq.-1 means that the the code stopped 
-!----------------------------------------------------------------------- 
+!------------------------------------------------------------------------!
+! DenseEigenSolver                                                       !
+!------------------------------------------------------------------------! 
+!                                                                        ！
+! Calculate the eigenvalue problem of small matrix                       !   
+! Note: Different method will generate a total different matrix, thus    !
+!       It's better not to modify this subroutine.                       ！   
+!------------------------------------------------------------------------!
+! on entry:                                                              ！
+!---------                                                               ！
+!                                                                        ！
+! ptr   = The global Indicator                                           ！
+! nrow  = row-dimension of A and B                                       ！
+! work  = The working array, dimention(Iwork)                            !
+! Iwork = The demension of the working array                             !
+!                                                                        ！  
+! on return:                                                             ！
+!----------                                                              ！
+! work  = The working array, dimention(Iwork)                            !
+!         More details about work please see BGK_SS_interface            ！
+!                                                                        ！
+!------------------------------------------------------------------------！ 
 subroutine DenseEigenSolver(ptr, nrow, work, IWORK, eigval, info)
   implicit none
   type(Indicator), intent(inout), target :: ptr
@@ -345,7 +348,7 @@ subroutine DenseEigenSolver(ptr, nrow, work, IWORK, eigval, info)
   
 end subroutine
 
-!------------------------------------------------------------------------��
+!------------------------------------------------------------------------£¡
 ! Dgre
 !----------------------------------------------------------------------- 
 !
@@ -414,7 +417,7 @@ end subroutine
 !             tmp_mat(i,i) =  ONE_M
 !         enddo
 !         tmp_mat = dwork(ws) * tmp_mat
-!         !Mu�洢(H - theta*I)
+!         !Mu´æ´¢(H - theta*I)
 !         Mu(:,LM+1:2*LM) =  Mu(:,1:LM) -  tmp_mat
 !         itask = ZPARES_TASK_MULT_C
 !         call start_timer(prm%timer_mult_C)
@@ -422,7 +425,7 @@ end subroutine
 !         return
 !  end select 
 !  end subroutine 
-!------------------------------------------------------------------------��
+!------------------------------------------------------------------------£¡
 ! Dgre
 !----------------------------------------------------------------------- 
 !
