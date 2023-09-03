@@ -57,4 +57,4 @@ BGK_SS.o      : BGK_SS.f90 \
 
 
 clean :
-	rm -f *.o *.mod ../include/BGK_SS.mod ../lib/libbgk_ss.a  
+	rm -f *.o *.mod ../include/bgk_ss.mod ../lib/libbgk_ss.a  

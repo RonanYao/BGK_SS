@@ -40,16 +40,30 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
     L = ptr%L
     M = ptr%M
     Mpi_Common = ptr%Mpi_Common
+#ifdef MPI
+    call MPI_COMM_RANK(mpi_comm, rank, ierr)
+    call MPI_COMM_SIZE(mpi_comm, size, ierr)
+#else
+    rank = 0
+    size = 1
+#endif
     Iwork = (L*(1+m)+1)*nrow
-    
+!        %-------------------------------------------------------------%
+!        | Pointer into WORKL for address of temporal vector, V, S,    |
+!        | etc... and the remaining workspace.                         |
+!        | Also update pointer to be used on output.                   |
+!        | Memory is laid out as follows:                              |
+!        | workl(1:nrow) := temporal vector                            |
+!        | workl(nrow+1:(L+1)*nrow) := the initial Block matrix V      |
+!        | workl((L+1)*nrow+1:(L*M+L+1)*nrow) := projection matrix S   |
+!        %-------------------------------------------------------------%
     allocate(work(Iwork), V(nrow, L))
-    call get_rank_and_size(Mpi_Common, rank, size)
     call create_hutch_samples(V, nrow, L, rank, ierr)
     do i = 1, L
         work((1+i-1)*nrow+1:(i+1)*nrow) = V(1:nrow, i)
     enddo
 
-    call DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK, Mpi_Common)
+    call DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
     call DenseSVD(ptr, nrow, work, IWORK)
     call DenseEigenSolver(ptr, nrow, work, IWORK, eigval, ierr)
     

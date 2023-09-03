@@ -46,7 +46,7 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
   MATRIX_TYPE, intent(in)                :: A(nrow, ncol), B(nrow, ncol)
   MATRIX_TYPE, intent(inout)             :: work(IWORK)
   !---------------local variables--------------
-  integer      :: i, j, jx, L, M, N, IPIV(nrow), mpi_comm&
+  integer      :: i, j, jx, L, M, N, IPIV(nrow), mpi_comm, &
                   taskstart, tasknum, Index,  ierr, subs
   COMPLEX_TYPE :: z, weight, zeta, const, temp(ncol)
   REAL_TYPE    :: ratio
@@ -55,7 +55,7 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
   if(nrow .ne. ncol)then
       write(*, *) 'The Matrix is not square !'
       return
-  end if\
+  end if
   
   L = ptr%L
   Index = 0
@@ -100,7 +100,7 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
           work(jx*ncol+1 : (jx+1)*ncol)
       enddo
   enddo
-  call BGK_SS_Fortran(_ALLREDUCE_SUM_1D)&
+  call BGK_SS_Fortran(_VecSum)&
        (work((L+1)*ncol+1:(L*m+L+1)*ncol), L*M*ncol, ierr, mpi_comm)
  
 
@@ -191,9 +191,10 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
   integer, intent(in)                    :: nrow, IWORK
   MATRIX_TYPE, intent(inout)             :: work(IWORK) 
   !---------------local variables--------------
-  integer      :: i, L, LM, num_basis, infola
+  integer                  :: i, L, LM, num_basis, infola
+  REAL_TYPE, allocatable   :: sigma(:)
   MATRIX_TYPE, allocatable :: tmp_mat(:,:), R(:,:), &
-                              H0(:,:), H1(:,:), sigma(:)
+                              H0(:,:), H1(:,:)
   MATRIX_TYPE, pointer     :: projs(:,:), proj_res(:,:)
   
   LM = ptr%L * ptr%M
@@ -213,8 +214,8 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
      !R_m = R_m+1(1:LM,1:LM)
      R = tmp_mat(1:LM,1:LM)
      
-     call BGK_SS_SVD(ptr, 'B', LM, work, IWORK, sigma, projs(:,1:LM), &
-                      projs(:,LM+1:2*LM), num_basis, infola)
+     call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, work, IWORK, sigma, &
+          projs(:,1:LM), projs(:,LM+1:2*LM), num_basis, infola)
 
      ptr%sig_val(1:LM) = sigma(1:LM)
 
