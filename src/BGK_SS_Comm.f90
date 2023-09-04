@@ -166,6 +166,7 @@ end subroutine Get_proc_task
     call BGK_SS_Fortran(LARNV) &
          (2, iseed, nrow*ncol, tmpV)
     V(:,1:ncol) = tmpV(:,1:ncol)
+    ierr = 0
     deallocate(tmpV)
     end subroutine
     
@@ -193,9 +194,9 @@ end subroutine Get_proc_task
 !         ierr .eq. 0 means normal reture                                ！
 !                                                                        ！
 !------------------------------------------------------------------------！ 
-subroutine create_hutch_samples(V, nrow, ncol, rank, ierr)
+subroutine create_hutch_samples(V, nrow, ncol, ierr)
     implicit none
-    integer, intent(in)      :: nrow, ncol, rank
+    integer, intent(in)      :: nrow, ncol
     MATRIX_TYPE, intent(out) :: V(nrow,ncol)
     integer, intent(out)     :: ierr
     !----------------local variables-----------------------------------
@@ -203,7 +204,7 @@ subroutine create_hutch_samples(V, nrow, ncol, rank, ierr)
     double precision         :: ONE_R, ZERO_R
     parameter(ONE_R = 1D0, ZERO_R = 0D0)
     
-    call create_rand_matrix(V, nrow, ncol, rank, ierr)
+    call create_rand_matrix(V, nrow, ncol, 0, ierr)
     if(ierr .ne. 0) return
     do j = 1, ncol
        do i = 1, nrow
@@ -211,8 +212,51 @@ subroutine create_hutch_samples(V, nrow, ncol, rank, ierr)
        end do
     end do
     ierr = 0
-    end subroutine
+  end subroutine
+!------------------------------------------------------------------------!
+! create_hutch_vectors                                                   !
+!------------------------------------------------------------------------! 
+!                                                                        ！
+! To initialise the inital rand block matrix                             !           
+! Note: -1 or 1 is even distributed in Every entry of this matrix        !                         ！
+!------------------------------------------------------------------------!
+! on entry:                                                              ！
+!---------                                                               ！
+!                                                                        ！
+! nrow = row-dimension of input matrix                                   i
+! rhs  = col-dimension of initial block matrix V                         i
+! work  = The working array, dimention(Iwork)                            !
+! Iwork = The demension of the working array                             !
+!                                                                        ！
+! on return:                                                             ！
+!----------                                                              ！
+!                                                                        ！
+! work  = work(nrow+1:rhs*nrow) storing the hutch matrix                 !
+!                                                                        ！
+! ierr  = integer error indicator:                                       !
+!         ierr .eq. 0 means normal reture                                ！
+!                                                                        ！
+!------------------------------------------------------------------------！ 
+subroutine create_hutch_vectors(nrow, rhs, work, Iwork, ierr)
+    implicit none
+    integer, intent(in)        :: nrow, rhs, Iwork
+    MATRIX_TYPE, intent(inout) :: work(Iwork)
+    integer, intent(out)       :: ierr
+    !----------------local variables-----------------------------------
+    integer                  :: i, j
+    MATRIX_TYPE              :: V(nrow, rhs)
+    double precision         :: ONE_R, ZERO_R
+    parameter(ONE_R = 1D0, ZERO_R = 0D0)
     
+    call create_rand_matrix(V, nrow, rhs, 0, ierr)
+    if(ierr .ne. 0) return
+    do j = 1, rhs
+       do i = 1, nrow
+          work(i*nrow+j) = cmplx(sign(ONE_R, real(V(i,j), kind(ZERO_R))), ZERO_R, kind(ZERO_R))
+       end do
+    end do
+    ierr = 0
+  end subroutine   
 !------------------------------------------------------------------------!
 ! quad_ell_trap                                                          !
 !------------------------------------------------------------------------! 

@@ -30,7 +30,7 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
     !------------local vairables-------------
     integer :: i, L, M, Iwork, &
                Mpi_Common, rank, size, ierr
-    MATRIX_TYPE, allocatable :: work(:), V(:, :) 
+    MATRIX_TYPE, allocatable :: work(:)
     
     if(nrow .ne. ncol) then
         write(*,*) "This method only provides the eigensolver for square matrix."
@@ -41,8 +41,8 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
     M = ptr%M
     Mpi_Common = ptr%Mpi_Common
 #ifdef MPI
-    call MPI_COMM_RANK(mpi_comm, rank, ierr)
-    call MPI_COMM_SIZE(mpi_comm, size, ierr)
+    call MPI_COMM_RANK(Mpi_Common, rank, ierr)
+    call MPI_COMM_SIZE(Mpi_Common, size, ierr)
 #else
     rank = 0
     size = 1
@@ -57,14 +57,11 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
 !        | workl(nrow+1:(L+1)*nrow) := the initial Block matrix V      |
 !        | workl((L+1)*nrow+1:(L*M+L+1)*nrow) := projection matrix S   |
 !        %-------------------------------------------------------------%
-    allocate(work(Iwork), V(nrow, L))
-    call create_hutch_samples(V, nrow, L, rank, ierr)
-    do i = 1, L
-        work((1+i-1)*nrow+1:(i+1)*nrow) = V(1:nrow, i)
-    enddo
-
+    allocate(work(Iwork))
+    call create_hutch_vectors(nrow, L, work, Iwork, ierr)
     call DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
     call DenseSVD(ptr, nrow, work, IWORK)
+    pause
     call DenseEigenSolver(ptr, nrow, work, IWORK, eigval, ierr)
     
     if(ierr .ne. 0) then
@@ -72,6 +69,6 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
     return
     endif
     
-    deallocate(work, V)
+    deallocate(work)
 end subroutine BGK_SS_DG  
     

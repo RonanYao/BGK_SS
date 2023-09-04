@@ -5,12 +5,14 @@ subroutine BGK_SS_Fortran(_VecSum) &
 #ifdef MPI
     include 'mpif.h'
 #endif
+    MATRIX_TYPE, intent(inout) :: Vec(n)
     integer, intent(in) :: n
     integer, intent(out) :: ierr
     integer, intent(in), optional :: mpi_comm
 !---------------local variables--------------
     integer :: comm
-    MATRIX_TYPE, intent(inout) :: Vec(n)
+
+
 #ifdef MPI
     if ( present(mpi_comm) ) then
        comm = mpi_comm       

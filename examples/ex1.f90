@@ -51,7 +51,7 @@
   ptr%M = M
   ptr%centre = centre
   ptr%radius = radius
-  ptr%Mpi_Common = MPI_COMM_WORLD
+  ptr%Mpi_Common = MPI_COMM_SELF
 
   ncv = Indicator_get_ncv(ptr)
   allocate(eigval(ncv))

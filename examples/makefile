@@ -35,5 +35,5 @@ ex1: ex1.o
 	$(FC) $(FFLAG) $^ $(LINK) -o $@
 
 .PHONY: clean
-clean: 
-        rm -f *.o  
+clean:
+	rm -f *.o  

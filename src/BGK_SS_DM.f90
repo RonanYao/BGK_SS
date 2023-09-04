@@ -92,6 +92,8 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
       endif
       ratio = (i-1)/N
       temp = work((floor(ratio)+1)*ncol+1 : (floor(ratio)+2)*ncol)
+      call BGK_SS_Fortran(GETRF) &
+           (nrow, ncol, C, nrow, ipiv, ierr) 
       call BGK_SS_Fortran(GETRS) &
            ('N', nrow, 1, C, nrow, ipiv, temp, ncol, ierr) 
       do j = 1, subs
@@ -102,8 +104,6 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
   enddo
   call BGK_SS_Fortran(_VecSum)&
        (work((L+1)*ncol+1:(L*m+L+1)*ncol), L*M*ncol, ierr, mpi_comm)
- 
-
 end subroutine
     
 !------------------------------------------------------------------------!
@@ -135,20 +135,19 @@ subroutine DenseStochastic(ptr, nrow, work, IWORK, m_num)
   MATRIX_TYPE, intent(out)               :: m_num
   !---------------local variables--------------
   integer      :: i, j, L, nev, Mpi_Common, ierr
-  MATRIX_TYPE  :: hmat(nrow, ptr%L), dot(ptr%L)
+  MATRIX_TYPE  :: dot(ptr%L)
   MATRIX_TYPE, allocatable :: tmp_m1d(:)
 
   L = ptr%L
-  Mpi_Common = ptr%Mpi_Common
-  call create_hutch_samples(hmat, nrow, L, Mpi_Common, ierr)
+
   allocate(tmp_m1d(L))
   
   do i = 1, L
       do j = 1, nrow
 #ifdef REALMAT
-          dot(i) = dot(i) + hmat(j,i)*work((i+L)*nrow+j)
+          dot(i) = dot(i) + work(i*nrow+j)*work((i+L)*nrow+j)
 #else
-          dot(i) = dot(i) + conjg(hmat(j,i))*work((i+L)*nrow+j)
+          dot(i) = dot(i) + conjg(work(i*nrow+j))*work((i+L)*nrow+j)
 #endif
       enddo
   enddo
@@ -197,7 +196,8 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
                               H0(:,:), H1(:,:)
   MATRIX_TYPE, pointer     :: projs(:,:), proj_res(:,:)
   
-  LM = ptr%L * ptr%M
+  L = ptr%L
+  LM = L * ptr%M
   num_basis = ptr%num_basis
   
   select case(ptr%Method)
@@ -206,10 +206,15 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
      
   case(SS_ComAvoArnoldi)
       
-    
-     allocate(tmp_mat(LM+L,LM+L),R(LM,LM), sigma(LM))
+     
+     print *, LM+L, LM
+
+     allocate(R(LM+L,LM+L),tmp_mat(LM+L,LM+L))
+     pause
      tmp_mat = 0D0
+     allocate(tmp_mat(LM+L,LM+L),sigma(LM))
      call ModifyGS_QR(ptr, nrow, LM + L, work, IWORK, R)
+
      call ProjsInit(ptr, LM, 2*LM, projs)
      !R_m = R_m+1(1:LM,1:LM)
      R = tmp_mat(1:LM,1:LM)
@@ -222,8 +227,7 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
      do i = 1, LM
         projs(1:num_basis,LM+i) = projs(1:num_basis,LM+i) /sigma(1:num_basis)
      end do
-     deallocate(R)
-     
+     deallocate(R, sigma)
      if(ptr%calc_res) then
          
          allocate(H0(LM,LM), H1(num_basis,LM))        
@@ -239,7 +243,6 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
          deallocate(H0,H1)
          
      endif
-     
      allocate(R(LM,num_basis))
 
      call BGK_SS_Fortran(GEMM)('N', 'C', LM, num_basis, LM &
