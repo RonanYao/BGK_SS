@@ -41,6 +41,7 @@ subroutine ProjsInit(ptr, nrow, ncol, projs)
    MATRIX_TYPE, intent(out), pointer :: projs(:,:)
    
    allocate(ptr%BGK_SS_Fortran(projS)(nrow, ncol))
+   ptr%BGK_SS_Fortran(projS) = ZERO
    projs => ptr%BGK_SS_Fortran(projS)
    
 end subroutine ProjsInit   
@@ -52,6 +53,7 @@ subroutine Proj_resInit(ptr, nrow, ncol, proj_res)
    MATRIX_TYPE, intent(out), pointer :: proj_res(:,:)
    
    allocate(ptr%BGK_SS_Fortran(proj_res)(nrow, ncol))
+   ptr%BGK_SS_Fortran(proj_res) = ZERO
    proj_res => ptr%BGK_SS_Fortran(proj_res)
    
    
@@ -150,10 +152,9 @@ end subroutine Get_proc_task
     COMPLEX_TYPE, intent(out) :: V(nrow,ncol)
     integer, intent(out)      :: ierr
     !-----------local scalar-------------
-    integer                :: iseed(4)
-    REAL_TYPE, allocatable :: tmpV(:,:)
+    integer      :: iseed(4)
+    COMPLEX_TYPE :: tmpV(nrow, ncol)
     
-    allocate(tmpV(nrow,ncol))
     iseed(1) = modulo(rank-2*4096, 4096) ! must be between 0 and 4095
     iseed(2) = modulo(rank-4096, 4096)   ! must be between 0 and 4095
     iseed(3) = modulo(rank, 4096)        ! must be between 0 and 4095
@@ -167,7 +168,7 @@ end subroutine Get_proc_task
          (2, iseed, nrow*ncol, tmpV)
     V(:,1:ncol) = tmpV(:,1:ncol)
     ierr = 0
-    deallocate(tmpV)
+    
     end subroutine
     
 #endif
@@ -250,8 +251,8 @@ subroutine create_hutch_vectors(nrow, rhs, work, Iwork, ierr)
     
     call create_rand_matrix(V, nrow, rhs, 0, ierr)
     if(ierr .ne. 0) return
-    do j = 1, rhs
-       do i = 1, nrow
+    do i = 1, rhs
+       do j = 1, nrow
           work(i*nrow+j) = cmplx(sign(ONE_R, real(V(i,j), kind(ZERO_R))), ZERO_R, kind(ZERO_R))
        end do
     end do
@@ -285,8 +286,8 @@ subroutine create_hutch_vectors(nrow, rhs, work, Iwork, ierr)
     type(Indicator), intent(inout) :: ptr
     !---------------local scalar------------------------
     integer      :: i, N
-    COMPLEX_TYPE :: t, centre
-    REAL_TYPE    :: pi, radius, ONE_R, ZERO_R, asp_ratio
+    COMPLEX_TYPE :: centre
+    REAL_TYPE    :: t, pi, radius, ONE_R, ZERO_R, asp_ratio
     PARAMETER(pi = 3.14159265358979323846D0)
     parameter(ONE_R = 1.0D0, ZERO_R = 0.0D0)
 
@@ -300,8 +301,8 @@ subroutine create_hutch_vectors(nrow, rhs, work, Iwork, ierr)
     
     do i = 1, N
         t = (ONE_R+ONE_R) * pi / N * ((i - 1) + 1/(ONE_R+ONE_R))
-        ptr%zeta(i) = cos(t) + i * asp_ratio * sin(t)
-        ptr%weight(i) = radius * (i * sin(t) + asp_ratio * cos(t)) / N
+        ptr%zeta(i) = cmplx(cos(t), asp_ratio * sin(t), 8)
+        ptr%weight(i) = radius * (cmplx(asp_ratio * cos(t), sin(t), 8)) / N
         ptr%z(i) = centre + radius * ptr%zeta(i)
     enddo
     

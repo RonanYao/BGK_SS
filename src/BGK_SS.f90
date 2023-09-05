@@ -163,7 +163,6 @@ module BGK_SS
     Indicator%Mpi_Common = MPI_COMM_SELF    
 #endif
 
-
   end subroutine Indicator_init
 
   integer function Indicator_get_ncv(ptr)
@@ -181,6 +180,12 @@ module BGK_SS
     implicit none
     type(Indicator) :: ptr
 
+    if ( associated(ptr%sig_val) ) then
+       deallocate(ptr%sig_val)
+    end if
+     if ( associated(ptr%indi_spu) ) then
+       deallocate(ptr%indi_spu)
+    end if
     if ( associated(ptr%zeta) ) then
        deallocate(ptr%zeta)
     end if

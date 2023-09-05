@@ -47,7 +47,7 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
     rank = 0
     size = 1
 #endif
-    Iwork = (L*(1+m)+1)*nrow
+
 !        %-------------------------------------------------------------%
 !        | Pointer into WORKL for address of temporal vector, V, S,    |
 !        | etc... and the remaining workspace.                         |
@@ -55,13 +55,26 @@ subroutine BGK_SS_DG(ptr, nrow, ncol, A, B, eigval)
 !        | Memory is laid out as follows:                              |
 !        | workl(1:nrow) := temporal vector                            |
 !        | workl(nrow+1:(L+1)*nrow) := the initial Block matrix V      |
-!        | workl((L+1)*nrow+1:(L*M+L+1)*nrow) := projection matrix S   |
+!        | workl((L+1)*nrow+1:(L*(M+1)+1)*nrow):= projection matrix S  |
+!        | In SS-CAA method,                                           |
+!        | workl((L+1)*nrow+1:(L*(M+2)+1)*nrow):= projection matrix S  |
 !        %-------------------------------------------------------------%
+    select case(ptr%Method)
+    case(SS_RaylaignRitzs)
+        
+    case(SS_Arnoldi)
+        
+    case(SS_ComAvoArnoldi)
+        
+        Iwork = (L*(2+m)+1)*nrow
+        
+    end select
+    
     allocate(work(Iwork))
+    work = 0
     call create_hutch_vectors(nrow, L, work, Iwork, ierr)
     call DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
     call DenseSVD(ptr, nrow, work, IWORK)
-    pause
     call DenseEigenSolver(ptr, nrow, work, IWORK, eigval, ierr)
     
     if(ierr .ne. 0) then

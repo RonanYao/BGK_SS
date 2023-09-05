@@ -81,25 +81,25 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
 
   call Get_proc_task(ptr, taskstart, tasknum)
   
-  do i = taskstart, (taskstart + tasknum)
-      ratio = (i-1)/L
+  do i = taskstart, tasknum
+      ratio = (i-1)/L + 1
       if(Index .ne. floor(ratio))then
-          Index = floor(ratio) + 1
+          Index = floor(ratio) 
           z  = ptr%z(Index)
           weight = ptr%weight(Index)
           zeta = ptr%zeta(Index)
           C = z*B - A
-      endif
-      ratio = (i-1)/N
-      temp = work((floor(ratio)+1)*ncol+1 : (floor(ratio)+2)*ncol)
-      call BGK_SS_Fortran(GETRF) &
+          call BGK_SS_Fortran(GETRF) &
            (nrow, ncol, C, nrow, ipiv, ierr) 
+      endif
+      ratio = (i-1)/N + 1
+      temp = work(floor(ratio)*ncol+1 : (floor(ratio)+1)*ncol)
       call BGK_SS_Fortran(GETRS) &
            ('N', nrow, 1, C, nrow, ipiv, temp, ncol, ierr) 
       do j = 1, subs
-          jx = L*J+1 + floor(ratio)
-          work(jx*ncol+1 : (jx+1)*ncol) =  weight*zeta**(j-1) * &
-          work(jx*ncol+1 : (jx+1)*ncol)
+          jx = L*j + floor(ratio) - 1
+          work(jx*ncol+1 : (jx+1)*ncol) = work(jx*ncol+1 : (jx+1)*ncol) +& 
+          weight*zeta**(j-1)*temp
       enddo
   enddo
   call BGK_SS_Fortran(_VecSum)&
@@ -207,27 +207,25 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
   case(SS_ComAvoArnoldi)
       
      
-     print *, LM+L, LM
-
-     allocate(R(LM+L,LM+L),tmp_mat(LM+L,LM+L))
-     pause
-     tmp_mat = 0D0
-     allocate(tmp_mat(LM+L,LM+L),sigma(LM))
-     call ModifyGS_QR(ptr, nrow, LM + L, work, IWORK, R)
+     allocate(R(LM,LM),tmp_mat(LM+L,LM+L), sigma(LM))
+     sigma = ZERO
+     call ModifyGS_QR(ptr, nrow, LM + L, work, IWORK, tmp_mat)
 
      call ProjsInit(ptr, LM, 2*LM, projs)
      !R_m = R_m+1(1:LM,1:LM)
      R = tmp_mat(1:LM,1:LM)
      
-     call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, work, IWORK, sigma, &
+     call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, LM, R, sigma, &
           projs(:,1:LM), projs(:,LM+1:2*LM), num_basis, infola)
-
-     ptr%sig_val(1:LM) = sigma(1:LM)
+     !call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, work, IWORK, sigma, &
+     !     projs(:,1:LM), projs(:,LM+1:2*LM), num_basis, infola)
+     allocate(ptr%sig_val(num_basis))
+     ptr%sig_val(1:num_basis) = sigma(1:num_basis)
 
      do i = 1, LM
         projs(1:num_basis,LM+i) = projs(1:num_basis,LM+i) /sigma(1:num_basis)
      end do
-     deallocate(R, sigma)
+
      if(ptr%calc_res) then
          
          allocate(H0(LM,LM), H1(num_basis,LM))        
@@ -243,7 +241,6 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
          deallocate(H0,H1)
          
      endif
-     allocate(R(LM,num_basis))
 
      call BGK_SS_Fortran(GEMM)('N', 'C', LM, num_basis, LM &
           , ONE, tmp_mat(1:LM,L+1:LM+L), LM, projs(1,LM+1), LM, ZERO, R, LM)
@@ -253,7 +250,7 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
           , ONE, projs(1,1), LM, R, LM, ZERO, tmp_mat(1:LM,L+1:LM+L), LM)
 
      projs(1:num_basis,LM+1:LM+num_basis)= tmp_mat(1:num_basis,L+1:LM+num_basis)
-     deallocate(tmp_mat,R)
+     deallocate(tmp_mat, R, sigma)
      
      end select 
 

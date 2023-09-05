@@ -45,9 +45,9 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
 #else
               R(j,i) =  ZDOTC &
 #endif
-             (nrow, work((j+L+1)*nrow+1:(j+L+2)*nrow), 1, work((i+L+1)*nrow+1:(i+L+2)*nrow),1)
-              work((i+L+1)*nrow+1:(i+L+2)*nrow) = work((i+L+1)*nrow+1:(i+L+2)*nrow) - R(j,i)*&
-                  work((j+L+1)*nrow+1:(j+L+2)*nrow)
+             (nrow, work((j+L)*nrow+1:(j+L+1)*nrow), 1, work((i+L)*nrow+1:(i+L+1)*nrow),1)
+              work((i+L)*nrow+1:(i+L+1)*nrow) = work((i+L)*nrow+1:(i+L+1)*nrow) - R(j,i)*&
+                  work((j+L)*nrow+1:(j+L+1)*nrow)
          enddo
          do j = 1, ncol
               if ( i > j ) then
@@ -59,26 +59,27 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
 #else
         R(i,i) =  DZNRM2 &
 #endif
-        (nrow, work((i+L+1)*nrow+1:(i+L+2)*nrow), 1)
+        (nrow, work((i+L)*nrow+1:(i+L+1)*nrow), 1)
         work((i+L+1)*nrow+1:(i+L+2)*nrow) = work((i+L+1)*nrow+1:(i+L+2)*nrow)/R(i,i)
     enddo
   end subroutine
     
   subroutine BGK_SS_Fortran(_SVD) &
-  (ptr, NLRB, nrow, work, IWORK, sigma, U, VT, num_rank, info)
+  (ptr, NLRB, nrow, ncol, Mat, sigma, U, VT, num_rank, info)
     implicit none
     type(Indicator), intent(in) :: ptr
     character, intent(in)       :: NLRB
-    integer, intent(in)         :: nrow, IWORK
-    MATRIX_TYPE, intent(in)     :: work(IWORK)
+    integer, intent(in)         :: nrow, ncol
+    MATRIX_TYPE, intent(inout)  :: Mat(nrow, ncol)
     integer, intent(out)        :: num_rank, info
     MATRIX_TYPE, intent(out)    :: U(:,:), VT(:,:)
     REAL_TYPE, intent(out)      :: sigma(:)
 !---------------local variables--------------
     character   :: jobU, jobVT
-    integer     :: i, L, ncol, sig_size, lwork, infola, LDU, LDVT
-    REAL_TYPE   :: sigma_max, num_thres, optlwork
-    MATRIX_TYPE,allocatable :: mat(:,:), cwork(:)
+    integer     :: i, L, sig_size, lwork, LDU, LDVT
+    REAL_TYPE   :: sigma_max, num_thres
+    MATRIX_TYPE :: optlwork
+    MATRIX_TYPE,allocatable ::  cwork(:)
 #ifndef REALMAT
     REAL_TYPE, allocatable :: rwork(:)
     allocate(rwork(5*max(nrow,ncol)))
@@ -106,15 +107,8 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
        LDVT  = nrow
     end if
     
-    L = ptr%L
-    ncol = ptr%L * ptr%M
     num_thres = ptr%num_thres
     sig_size = min(nrow, ncol)
-    allocate(mat(nrow, ncol))
-    
-    do i = 1, ncol
-        mat(1:nrow, i) = work((i+L)*nrow+1:(i+L+1)*nrow)
-    enddo
     
     call BGK_SS_Fortran(GESVD) &
     (jobU, jobVT, nrow, ncol, mat, nrow, sigma, U, LDU, VT, LDVT, optlwork, -1 &
@@ -123,9 +117,9 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
 #else
     , rwork, info)
 #endif
-    lwork = int(optlwork)
+    lwork = int(real(optlwork))
     allocate(cwork(lwork))
-
+    cwork = ZERO
     call BGK_SS_Fortran(GESVD) &
     (jobU, jobVT, nrow, ncol, mat, nrow, sigma, U, LDU, VT, LDVT, cwork, lwork &
 #ifdef REALMAT
@@ -142,7 +136,7 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
     end do
     
     num_rank = num_rank - 1
-    deallocate(mat, cwork)
+    deallocate(cwork)
 #ifndef REALMAT
     deallocate(rwork)
 #endif
