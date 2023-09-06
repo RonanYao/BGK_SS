@@ -38,6 +38,7 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
     integer     :: info, i, j, L, indx
     
     L = ptr%L
+    R = 0
     do i = 1, ncol 
          do j = 1, i-1
 #ifdef REALMAT
@@ -48,6 +49,7 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
              (nrow, work((j+L)*nrow+1:(j+L+1)*nrow), 1, work((i+L)*nrow+1:(i+L+1)*nrow),1)
               work((i+L)*nrow+1:(i+L+1)*nrow) = work((i+L)*nrow+1:(i+L+1)*nrow) - R(j,i)*&
                   work((j+L)*nrow+1:(j+L+1)*nrow)
+              print *, R(j,i)
          enddo
          do j = 1, ncol
               if ( i > j ) then
@@ -62,6 +64,7 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
         (nrow, work((i+L)*nrow+1:(i+L+1)*nrow), 1)
         work((i+L+1)*nrow+1:(i+L+2)*nrow) = work((i+L+1)*nrow+1:(i+L+2)*nrow)/R(i,i)
     enddo
+    
   end subroutine
     
   subroutine BGK_SS_Fortran(_SVD) &
@@ -73,7 +76,7 @@ subroutine BGK_SS_Fortran(_ModifyGS_QR) &
     MATRIX_TYPE, intent(inout)  :: Mat(nrow, ncol)
     integer, intent(out)        :: num_rank, info
     MATRIX_TYPE, intent(out)    :: U(:,:), VT(:,:)
-    REAL_TYPE, intent(out)      :: sigma(:)
+    REAL_TYPE, intent(out)      :: sigma(*)
 !---------------local variables--------------
     character   :: jobU, jobVT
     integer     :: i, L, sig_size, lwork, LDU, LDVT
@@ -154,7 +157,7 @@ subroutine BGK_SS_Fortran(_spec_eig)&
     MATRIX_TYPE, intent(out)    :: eigval(*)
 !---------------local variables--------------
     integer      :: lwork, infola
-    REAL_TYPE    :: optlwork
+    MATRIX_TYPE  :: optlwork
     MATRIX_TYPE,allocatable  :: cwork(:)
     REAL_TYPE,allocatable    :: rwork(:)
     COMPLEX_TYPE,allocatable :: VL(:,:), VR(:,:)
@@ -188,7 +191,7 @@ subroutine BGK_SS_Fortran(_spec_eig)&
             allocate(VR(order, order), rwork(2*order), VL(1,1))
             call BGK_SS_Fortran(GEEV) &
                 ('N', 'V', order, A, LDA, eigval, VL, 1, VR, order, optlwork, -1, rwork, infola)
-            lwork = int(optlwork)
+            lwork = int(real(optlwork))
             call BGK_SS_Fortran(GEEV) &
                 ('N', 'V', order, A, LDA, eigval, VL, 1, VR, order, work(1:lwork), lwork, rwork, infola)
             A(1:order,1:order) = VR(1:order,1:order)

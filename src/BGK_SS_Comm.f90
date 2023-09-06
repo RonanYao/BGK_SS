@@ -253,7 +253,7 @@ subroutine create_hutch_vectors(nrow, rhs, work, Iwork, ierr)
     if(ierr .ne. 0) return
     do i = 1, rhs
        do j = 1, nrow
-          work(i*nrow+j) = cmplx(sign(ONE_R, real(V(i,j), kind(ZERO_R))), ZERO_R, kind(ZERO_R))
+          work(i*nrow+j) = cmplx(sign(ONE_R, real(V(j,i), kind(ZERO_R))), ZERO_R, kind(ZERO_R))
        end do
     end do
     ierr = 0

@@ -97,13 +97,14 @@ subroutine DenseLinearSolver(ptr, nrow, ncol, A, B, work, IWORK)
       call BGK_SS_Fortran(GETRS) &
            ('N', nrow, 1, C, nrow, ipiv, temp, ncol, ierr) 
       do j = 1, subs
-          jx = L*j + floor(ratio) - 1
-          work(jx*ncol+1 : (jx+1)*ncol) = work(jx*ncol+1 : (jx+1)*ncol) +& 
-          weight*zeta**(j-1)*temp
+          jx = L*j + floor(ratio) 
+          work(jx*ncol+1 : (jx+1)*ncol) = work(jx*ncol+1 : (jx+1)*ncol) + &
+                                          weight*zeta**(j-1)*temp
       enddo
   enddo
   call BGK_SS_Fortran(_VecSum)&
-       (work((L+1)*ncol+1:(L*m+L+1)*ncol), L*M*ncol, ierr, mpi_comm)
+       (work((L+1)*ncol+1:(L*subs+L+1)*ncol), L*subs*ncol, ierr, mpi_comm)
+  print *, work((L+1)*ncol+1:(L+2)*ncol)
 end subroutine
     
 !------------------------------------------------------------------------!
@@ -208,18 +209,19 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
       
      
      allocate(R(LM,LM),tmp_mat(LM+L,LM+L), sigma(LM))
-     sigma = ZERO
+     sigma   = ZERO
+     tmp_mat = ZERO
      call ModifyGS_QR(ptr, nrow, LM + L, work, IWORK, tmp_mat)
 
      call ProjsInit(ptr, LM, 2*LM, projs)
-     !R_m = R_m+1(1:LM,1:LM)
+
      R = tmp_mat(1:LM,1:LM)
      
      call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, LM, R, sigma, &
           projs(:,1:LM), projs(:,LM+1:2*LM), num_basis, infola)
-     !call BGK_SS_Fortran(_SVD)(ptr, 'B', LM, work, IWORK, sigma, &
-     !     projs(:,1:LM), projs(:,LM+1:2*LM), num_basis, infola)
+
      allocate(ptr%sig_val(num_basis))
+     ptr%num_basis = num_basis
      ptr%sig_val(1:num_basis) = sigma(1:num_basis)
 
      do i = 1, LM
@@ -249,7 +251,7 @@ subroutine DenseSVD(ptr, nrow, work, IWORK)
      call BGK_SS_Fortran(GEMM)('C', 'N', num_basis, num_basis, LM &
           , ONE, projs(1,1), LM, R, LM, ZERO, tmp_mat(1:LM,L+1:LM+L), LM)
 
-     projs(1:num_basis,LM+1:LM+num_basis)= tmp_mat(1:num_basis,L+1:LM+num_basis)
+     projs(1:num_basis,LM+1:LM+num_basis)= tmp_mat(1:num_basis,L+1:L+num_basis)
      deallocate(tmp_mat, R, sigma)
      
      end select 
@@ -307,18 +309,17 @@ subroutine DenseEigenSolver(ptr, nrow, work, IWORK, eigval, info)
      issymtric = ptr%issymtric
      isHermit = ptr%isHermit
      projs => ptr%BGK_SS_Fortran(projS)
-     allocate(R(LM, LM), Ut(num_basis,num_basis), tmpvec(LM), tmpmat(1,1))
+     allocate(R(LM, LM), Ut(num_basis,num_basis), tmpvec(LM), tmpmat(1,1),ptr%indi_spu(num_basis))
      
      !call start_timer(prm%timer_reduced_eig)
      R = projs(1:LM,LM+1:LM+LM)
      
      call spec_eig('S', issymtric, isHermit, num_basis, R, LM, tmpmat, 1, work, Iwork, eigval, info) 
-     
+     print *,  eigval(1:num_basis)
      call BGK_SS_Fortran(GEMM)('N','N', num_basis, num_basis, num_basis &
           , ONE, projs(1:num_basis,1:num_basis), num_basis ,R(1:num_basis,1:num_basis), num_basis, ZERO, Ut, num_basis) 
 
      projs(1:num_basis,LM+1:LM+num_basis) = Ut
-     
      do i = 1, num_basis
            ptr%indi_spu(i) = sum(abs(R(:,i))**2) / sum(abs(R(:,i))**2/ptr%sig_val(1:num_basis))
      end do
